@@ -209,7 +209,6 @@ def test_ac27_identity_field_in_create_is_validation_error(conn, call_tool, snap
     assert request_rows(conn) == 0
 
 
-@pytest.mark.skip(reason="batch E")
 def test_ac27_identity_field_in_approve_is_validation_error(call_tool, insert_request, snapshot):
     r = insert_request("PENDING")
     before = snapshot()
@@ -238,7 +237,6 @@ def test_ac28_injected_description_is_stored_verbatim_and_grants_nothing(conn, c
     assert (me["role"], me["nonprofit_id"]) == ("CASE_WORKER", "np_bridge")
 
 
-@pytest.mark.skip(reason="batch E")
 def test_ac28_case_worker_cannot_approve_injected_request(call_tool):
     out = call_tool("create_request", "stf_bridge_cw", {**VALID, "purpose": "OTHER", "description": INJECTION})
 

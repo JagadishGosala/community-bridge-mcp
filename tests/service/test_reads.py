@@ -167,7 +167,6 @@ def test_ac35_summary_for_nonexistent_fund(conn, cw, call_tool):
     assert out.details == {"entity": "fund", "id": "fund_nope"}
 
 
-@pytest.mark.skip(reason="batch E")
 def test_ac35_approve_nonexistent(call_tool):
     out = call_tool("approve_request", "stf_bridge_pm", {"request_id": "req_doesnotexist"})
     assert out.code == "NOT_FOUND"

@@ -1,6 +1,6 @@
 """Identity re-resolution, unexpected exceptions and check order through the in-process adapter.
 
-AC-23, AC-36, REQ-28 (AC-37 waits for approve_request in batch E).
+AC-23, AC-36, AC-37, REQ-28.
 """
 
 import dataclasses
@@ -78,7 +78,6 @@ def test_ac36_unexpected_exception_gives_internal_error_without_leaks(db_path, c
     assert logged
 
 
-@pytest.mark.skip(reason="batch E")
 def test_ac37_check_order_validation_then_role_then_ownership(call_tool, insert_request):
     r = insert_request("PENDING")
     r_h = insert_request("PENDING", nonprofit_id="np_harbor")
