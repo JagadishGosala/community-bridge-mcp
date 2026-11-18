@@ -6,7 +6,7 @@ Version 1.0 · Source of truth for requirements: [Brief.md](Brief.md) · Plan: [
 
 A headless MCP server that lets staff at a nonprofit submit, approve or reject, and record simulated payment for emergency-assistance requests charged against grant funds. It keeps each fund's committed, paid and available amounts exact and prevents overspending. It also blocks duplicate financial effects and access across nonprofits. Phase 1 is a local, single-currency (USD) MVP over stdio with fixture identities.
 
-**Stack:** Python 3.12+, official `mcp` Python SDK (FastMCP) over stdio, Pydantic v2, standard-library `sqlite3`, pytest, uv (`uv.lock`, `.python-version`). Entry points: `uv run cb-server` (MCP server) and `uv run cb-reset` (create schema and seed data).
+**Stack:** Python 3.12+, official `mcp` Python SDK 2.3 (low-level `Server` API) over stdio, Pydantic v2, standard-library `sqlite3`, pytest, uv (`uv.lock`, `.python-version`). Entry points: `uv run cb-server` (MCP server) and `uv run cb-reset` (create schema and seed data).
 
 ## 2. Users and roles
 
@@ -284,7 +284,7 @@ FundSummary = { fund_id: Id, fund_name: string, allocation: Money,
 | `get_request` | "Get one request of your nonprofit by id, including payment details if paid. Read-only." | `{request_id: Id}` | `Request` | none | `NOT_FOUND` | all |
 | `list_requests` | "List requests of your nonprofit, optionally filtered by status and/or fund_id. Read-only." | `{status?: Status, fund_id?: Id}` | `{requests: [Request]}` | none | `NOT_FOUND` (unknown `fund_id`) | all |
 
-*Implementation note:* FastMCP's built-in argument handling may ignore unknown fields and format validation failures in its own way. The implementation must make sure unknown fields are rejected and that every validation failure surfaces as the §6.5 `VALIDATION_ERROR` body. T3 verifies this (see TASKS.md).
+*Implementation note:* tools are served through the SDK's low-level `Server`. One adapter publishes each tool's flat input schema (generated from its Pydantic model, `additionalProperties: false`), validates the raw arguments itself (`extra="forbid"`, strict types), runs the §6.3 pipeline, and returns `CallToolResult` directly, so the §6.5 error body is pure JSON. Synchronous handlers run on worker threads, so each call opens its own SQLite connection. A call to an unknown tool name is a protocol error (JSON-RPC `-32602`), not a tool result.
 
 ## 9. Permissions
 
@@ -405,3 +405,4 @@ In production the server would run over MCP Streamable HTTP as an **OAuth 2.1 re
 |---|---|---|---|
 | 1.0 | 2026-11-18 | Initial specification | — |
 | 1.1 | 2026-11-18 | TASKS.md: tasks delegated in 6 risk-based batches instead of one prompt per task | Fit the 3-hour time box; review gates, tests-first and per-batch commits retained |
+| 1.2 | 2026-11-18 | Stack: FastMCP → `mcp` 2.3 low-level `Server`; §8 implementation note rewritten (adapter, connection per call, unknown tool = JSON-RPC `-32602`) | T3 spike (mcp 2.3.0): FastMCP was renamed `MCPServer`; its high-level API silently drops unknown arguments, prefixes error text ("Error executing tool …") and nests single-model parameters, each conflicting with REQ-07, REQ-27 or §8. The low-level `Server` passes raw arguments and returned `CallToolResult`s through unchanged. |

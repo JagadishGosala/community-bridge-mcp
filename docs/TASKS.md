@@ -20,7 +20,7 @@ cb/
   models.py             # Pydantic input models (extra=forbid, strict) + output models
   errors.py             # error codes, AppError, envelope builder
   service.py            # business logic: functions(conn, caller, input) -> output | AppError
-  server.py             # FastMCP app, tool registration, check-order pipeline, cb-server main
+  server.py             # MCP SDK low-level Server adapter, tool registration, check-order pipeline, cb-server main
 tests/
   conftest.py           # fresh seeded DB per test, caller fixtures, MCP client helper
   unit/                 # test_money.py, test_models.py, test_schema.py, test_permissions.py
@@ -41,7 +41,7 @@ docs/                   # Brief, SPEC, TASKS, TRACEABILITY, AI_LOG_RAW, README m
 | T0 | Review and commit `SPEC.md`, `TASKS.md` and `TRACEABILITY.md` before any code | — | Commit exists containing only docs | Human read-through: every brief "must" maps to a REQ and an AC |
 | T1 | Scaffold: `uv init`, Python 3.12 pin, deps (`mcp`, `pydantic`, `pytest`, `pytest-asyncio` or `anyio`), console scripts, empty `cb/` and `tests/` | T0 | `uv sync --locked` and `uv run pytest` succeed (0 tests) | AC-41 |
 | T2 | Schema + reset/seed, **test-first**: `db.py`, `seed.py`, `reset.py` | T1 | `uv run cb-reset` creates the §11 DB; constraint tests pass | AC-12, AC-20, AC-33 (`tests/unit/test_schema.py`) |
-| T3 | **Walking skeleton:** `config.py`, `log.py`, `identity.py`, `server.py` with only `whoami` over stdio; startup failures. Spike: confirm (a) whether FastMCP rejects or ignores unknown fields; (b) whether a raised exception's text gets a prefix such as "Error executing tool …" (if so, return a `CallToolResult(isError=True)` directly so the error body is pure JSON per REQ-27); (c) that tools use flat parameters (a single Pydantic model parameter would nest the input schema and break §8); (d) whether sync tools run on worker threads (open a connection per call either way) | T2 | An SDK stdio client test launches `cb-server` as each seed identity and gets the correct `whoami`; bad startups exit non-zero | AC-21, AC-22, AC-32, AC-38; partial AC-29 (`tests/e2e/test_skeleton.py`, `test_startup.py`) |
+| T3 | **Walking skeleton:** `config.py`, `log.py`, `identity.py`, `server.py` with only `whoami` over stdio; startup failures. Spike: confirm (a) whether the SDK's high-level server (FastMCP) rejects or ignores unknown fields; (b) whether a raised exception's text gets a prefix such as "Error executing tool …" (if so, return a `CallToolResult(isError=True)` directly so the error body is pure JSON per REQ-27); (c) that tools use flat parameters (a single Pydantic model parameter would nest the input schema and break §8); (d) whether sync tools run on worker threads (open a connection per call either way) | T2 | An SDK stdio client test launches `cb-server` as each seed identity and gets the correct `whoami`; bad startups exit non-zero | AC-21, AC-22, AC-32, AC-38; partial AC-29 (`tests/e2e/test_skeleton.py`, `test_startup.py`) |
 | T4 | Money + input models, **test-first**: `money.py`, `models.py` | T1 | All invalid/valid amount, purpose, description, reason and extra-field cases pass at unit level | AC-24, AC-25, AC-26, AC-27 (unit) |
 | T5 | Errors + permissions + check-order pipeline, **test-first**: `errors.py`, `permissions.py`, pipeline in `server.py` | T3, T4 | Pipeline runs validation → identity → role → service; exceptions → `INTERNAL_ERROR` with `error_id` | AC-23, AC-36, AC-37 (`tests/service/test_identity.py`, `test_errors.py`, `tests/unit/test_permissions.py`) |
 | T6 | Read tools, **test-first**: `list_participants`, `list_funds`, `get_request`, `list_requests`, `get_funding_summary` in `service.py` | T2, T5 | Reads return only caller-nonprofit data; balances follow §6.2 | AC-16, AC-17, AC-35, AC-39 (`tests/service/test_reads.py`, `test_isolation.py`) |
@@ -62,7 +62,7 @@ To fit the time box, tasks are delegated in six risk-based batches instead of on
 | Batch | Tasks | Prompts |
 |---|---|---|
 | A | T1 + T2 (scaffold, schema, reset/seed) | 1 |
-| B | T3 (walking skeleton + FastMCP spike) | 1 |
+| B | T3 (walking skeleton + MCP SDK spike) | 1 |
 | C | T4 + T5 (money, models, errors, permissions, check-order pipeline) | 2 (tests, then code) |
 | D | T6 + T7 (reads, create_request) | 2 (tests, then code) |
 | E | T8 + T9 (approve, reject, record_payment) | 2 (tests, then code) |
