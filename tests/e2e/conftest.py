@@ -1,8 +1,14 @@
+import itertools
 import os
+import sys
+from contextlib import asynccontextmanager
 
 import pytest
+from mcp import ClientSession, StdioServerParameters, stdio_client
 
 from cb import reset
+
+SERVER = [sys.executable, "-m", "cb.server"]
 
 
 @pytest.fixture
@@ -32,3 +38,24 @@ def server_env():
         return env
 
     return make
+
+
+@pytest.fixture
+def mcp_session(server_env, tmp_path):
+    """Open an initialized SDK stdio session to a new cb-server process acting as staff_id.
+
+    Extra keyword arguments are added to the server environment. Each process's stderr
+    goes to its own file in tmp_path.
+    """
+    counter = itertools.count()
+
+    @asynccontextmanager
+    async def session(staff_id, db_path, **extra_env):
+        env = {**server_env(staff_id, db_path), **extra_env}
+        params = StdioServerParameters(command=SERVER[0], args=SERVER[1:], env=env)
+        with open(tmp_path / f"server-{next(counter)}-{staff_id}.stderr.txt", "w") as errlog:
+            async with stdio_client(params, errlog=errlog) as (read, write), ClientSession(read, write) as s:
+                await s.initialize()
+                yield s
+
+    return session

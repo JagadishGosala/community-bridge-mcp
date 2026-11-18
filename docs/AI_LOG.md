@@ -1,0 +1,26 @@
+# AI-Assisted Workflow
+
+**Tools:** Claude Code with Claude Opus 5.5 for drafting and implementation, and a separate Claude Opus 5.5 chat session for independent review. Every delegated batch followed the rules in TASKS.md (tests first, review gate, my own test run, commit). A factual per-task log was kept during the work; the three examples below are taken from it.
+
+<<OPTIONAL — keep if true:>> Before starting the timed session I discussed the brief and stack options with Claude.
+
+## 1. Requirements analysis and specification
+
+- **Context / prompt excerpt:** "We are starting a new project: an MCP server for emergency-assistance funding at nonprofits. This session produces Phase 1 documentation only. Do NOT write any code yet." I supplied my key decisions (integer cents, derived balances, conditional atomic approval, env-var identity, `NOT_FOUND` across nonprofits) and asked for REQ/AC ids mapped to every brief requirement.
+- **Result:** SPEC.md with REQ-01–REQ-33, AC-01–AC-41, DDL with composite foreign keys, the conditional approval SQL, a 10-tool MCP interface, plus TASKS.md and TRACEABILITY.md.
+- **Independent evidence:** a separate session reviewed the docs against the brief, and the §7 DDL and approval SQL were **executed** in SQLite: approvals of 6000 / 6000 / 4000 / 0.01 on a 10,000 fund returned rowcounts 1 / 0 / 1 / 0; a repeat approval and a cross-nonprofit approval returned 0; cross-nonprofit inserts, OTHER without a description and a second payment were rejected by constraints.
+- **Corrections:** (1) A raw Windows path (`E:\...`) would fail with SQLite's `mode=rw` URI, so A-17 now builds the URI with `Path.resolve().as_uri()`, and `cb-reset` also deletes the WAL `-wal`/`-shm` files. (2) The vague SDK spike in T3 was replaced with four concrete checks (unknown fields, error-text prefixing, nested parameters, threading).
+
+## 2. Implementation planning and coding
+
+- **Context / prompt excerpt:** T3 walking skeleton: "Write small throwaway experiments … to answer, with evidence, for the mcp version in uv.lock: (a) Does FastMCP reject or silently ignore unknown tool arguments? (b) … is a prefix like "Error executing tool …" added? …" and "If something in SPEC.md cannot be met with the installed SDK, stop and tell me … propose the exact §15 revision text instead."
+- **Result:** The spike (mcp 2.3.0) found FastMCP renamed `MCPServer`; its high-level API silently dropped `{"role": "PROGRAM_MANAGER"}` as an extra argument, prefixed error text with `"Error executing tool <name>: "`, and nested single-model parameters. The low-level `Server` passes raw arguments and returned `CallToolResult`s through unchanged. The agent built one adapter on the low-level `Server`.
+- **Independent evidence:** The spike's printed outputs, and tests that go through a real stdio client: an unknown field must return a body that parses as pure §6.5 JSON, and raw stdout must contain only JSON-RPC. My own run: 17 passed. The adapter was also reviewed by reading against SPEC §6.3/§6.5/§8 in the separate session.
+- **Corrections / decisions:** The agent offered to pin `mcp<2` to keep FastMCP; I chose to stay on the current SDK and recorded SPEC revision 1.2 (including the unknown-tool JSON-RPC `-32602` behaviour the spec had not covered). Later, the batch C+D tests assumed a different permissions interface than my implementation prompt; I changed the prompt to match the tests rather than let tests be edited.
+
+## 3. Debugging and verification
+
+- **Context / prompt excerpt:** Batch E (approve, reject, pay), tests first: "Every failure case asserts "unchanged" with the snapshot helper, including the payments row count." Then: "Never read the balance and write in separate steps." Batch F: "run the negative control ONCE … swap approve_request for a naive read-balance-then-update version … confirm it FAILS."
+- **Result:** 40 failing tests before implementation, then all passing. The tests included a subtle case: approving an already-approved request on a full fund must return `INVALID_TRANSITION`, not `INSUFFICIENT_FUNDS` (§6.3 order). The approval is the §7 conditional `UPDATE`, with the failure reason worked out inside the same transaction.
+- **Independent evidence:** My test runs (322 passed after batch E; 338 passed after batch F, no skips). The test snapshot computes balances with its own SQL, not through the service code. The delay hook measured 0.006 s unset vs 0.408 s at 400 ms, which proves the overlap is real. Two-process concurrency test: 10/10 iterations with exactly one approval each. Negative control: the same unchanged test run against a naive read-then-write approval failed with `assert 2 == 1`: both $6,000 requests were approved, committing $12,000 against the $10,000 fund. Also observed by accident: a `CB_STAFF_ID` with a trailing newline was rejected at startup ("unknown identity"), confirming fail-closed identity resolution.
+- **Corrections / findings:** Batch F's first stdout test asserted the logger name and failed: when the server is launched as `python -m cb.server` (as the tests do), log records are named `__main__` instead of `cb.server`. Output still went to stderr only, so AC-29 held. <<Resolution: fixed with an explicit `logging.getLogger("cb.server")` / left as a known limitation>>.
