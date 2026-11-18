@@ -404,3 +404,4 @@ In production the server would run over MCP Streamable HTTP as an **OAuth 2.1 re
 | Version | Date | Change | Reason |
 |---|---|---|---|
 | 1.0 | 2026-11-18 | Initial specification | — |
+| 1.1 | 2026-11-18 | TASKS.md: tasks delegated in 6 risk-based batches instead of one prompt per task | Fit the 3-hour time box; review gates, tests-first and per-batch commits retained |

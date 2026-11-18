@@ -55,6 +55,20 @@ docs/                   # Brief, SPEC, TASKS, TRACEABILITY, AI_LOG_RAW, README m
 
 Tasks T4 and T2–T3 can run in parallel. Everything else is sequential.
 
+### Execution batches
+
+To fit the time box, tasks are delegated in six risk-based batches instead of one prompt per task. Low-risk, mechanical tasks are combined; uncertain or money-critical work gets its own batch. Tests-first, review gates, per-batch commits and logging are unchanged.
+
+| Batch | Tasks | Prompts |
+|---|---|---|
+| A | T1 + T2 (scaffold, schema, reset/seed) | 1 |
+| B | T3 (walking skeleton + FastMCP spike) | 1 |
+| C | T4 + T5 (money, models, errors, permissions, check-order pipeline) | 2 (tests, then code) |
+| D | T6 + T7 (reads, create_request) | 2 (tests, then code) |
+| E | T8 + T9 (approve, reject, record_payment) | 2 (tests, then code) |
+| F | T10 + T11 + T12 (tool registration, concurrency, e2e flow + demo) | 1–2 |
+| — | T13 (docs) | done by me with AI assistance |
+
 ## Cut order if time runs short
 
 Cut from the top first:
@@ -71,7 +85,7 @@ Cut from the top first:
 
 ## Delegating to an AI coding agent
 
-- **One task per prompt.** The prompt names the task id and quotes the relevant SPEC sections and REQ/AC ids. It lists the files the agent may create or change and says "do not add tools, fields, states or rules not in SPEC.md; if something is unclear, stop and ask."
+- **One batch per prompt (see Execution batches).** The prompt names the task ids and quotes the relevant SPEC sections and REQ/AC ids. It lists the files the agent may create or change and says "do not add tools, fields, states or rules not in SPEC.md; if something is unclear, stop and ask."
 - **Tests first, owned by me.** For business-logic tasks I write or review the failing tests against the ACs before asking for implementation. The agent may not weaken, delete or skip a test to make it pass; any test change must be called out separately with a reason.
 - **Review the diff, not the summary.** Checklist: no `float` near money; every SQL statement parameterized and filtered by `nonprofit_id`; mutations only inside `BEGIN IMMEDIATE`; no `print` or stdout writes in server code; errors only through the §6.5 envelope; no new dependencies without a lockfile update.
 - **Independent evidence.** I run `uv run pytest` myself (and the demo for T12) instead of accepting "tests pass" claims, and record the actual output.
