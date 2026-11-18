@@ -7,14 +7,13 @@ Server passes raw arguments to one call handler, so this module owns input
 validation, the check order (§6.3) and the error body (§6.5).
 """
 
-import json
 import logging
 import sqlite3
 import sys
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 import anyio
 import mcp_types as types
@@ -22,34 +21,12 @@ from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 from mcp.shared.exceptions import MCPError
 from mcp_types.jsonrpc import INVALID_PARAMS
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ValidationError
 
-from cb import config, db, identity, log
+from cb import config, db, errors, identity, log, models, permissions, service
 from cb.identity import Caller
 
 logger = logging.getLogger(__name__)
-
-
-class WhoamiInput(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-
-class WhoamiOutput(BaseModel):
-    staff_id: str
-    staff_name: str
-    role: Literal["CASE_WORKER", "PROGRAM_MANAGER", "FINANCE"]
-    nonprofit_id: str
-    nonprofit_name: str
-
-
-def whoami(conn: sqlite3.Connection, caller: Caller, args: WhoamiInput) -> WhoamiOutput:
-    return WhoamiOutput(
-        staff_id=caller.staff_id,
-        staff_name=caller.staff_name,
-        role=caller.role,
-        nonprofit_id=caller.nonprofit_id,
-        nonprofit_name=caller.nonprofit_name,
-    )
 
 
 @dataclass(frozen=True)
@@ -77,56 +54,105 @@ TOOLS = {
         ToolSpec(
             name="whoami",
             description="Return the staff member this server acts as, with their role and nonprofit. Read-only.",
-            input_model=WhoamiInput,
-            output_model=WhoamiOutput,
-            handler=whoami,
+            input_model=models.WhoamiInput,
+            output_model=models.WhoamiOutput,
+            handler=service.whoami,
+            read_only=True,
+        ),
+        ToolSpec(
+            name="list_participants",
+            description="List participants of your nonprofit. Read-only.",
+            input_model=models.ListParticipantsInput,
+            output_model=models.ParticipantsOutput,
+            handler=service.list_participants,
+            read_only=True,
+        ),
+        ToolSpec(
+            name="list_funds",
+            description="List funds of your nonprofit with their fixed allocation in USD. Read-only.",
+            input_model=models.ListFundsInput,
+            output_model=models.FundsOutput,
+            handler=service.list_funds,
+            read_only=True,
+        ),
+        ToolSpec(
+            name="get_funding_summary",
+            description=(
+                "Show allocation, committed, paid and available USD amounts for one fund, "
+                "or for all funds of your nonprofit if fund_id is omitted. Read-only."
+            ),
+            input_model=models.GetFundingSummaryInput,
+            output_model=models.FundingSummaryOutput,
+            handler=service.get_funding_summary,
+            read_only=True,
+        ),
+        ToolSpec(
+            name="create_request",
+            description=(
+                "Create a PENDING assistance request for a participant against a fund. "
+                'amount is a USD decimal string such as "300.00". '
+                "Purpose OTHER requires a description. Does not reserve money. Requires CASE_WORKER."
+            ),
+            input_model=models.CreateRequestInput,
+            output_model=models.Request,
+            handler=service.create_request,
+            read_only=False,
+        ),
+        ToolSpec(
+            name="get_request",
+            description="Get one request of your nonprofit by id, including payment details if paid. Read-only.",
+            input_model=models.GetRequestInput,
+            output_model=models.Request,
+            handler=service.get_request,
+            read_only=True,
+        ),
+        ToolSpec(
+            name="list_requests",
+            description="List requests of your nonprofit, optionally filtered by status and/or fund_id. Read-only.",
+            input_model=models.ListRequestsInput,
+            output_model=models.RequestsOutput,
+            handler=service.list_requests,
             read_only=True,
         ),
     ]
 }
 
 
-def _text_result(body: dict[str, Any], *, is_error: bool) -> types.CallToolResult:
-    # A-16: success carries structuredContent plus the same JSON as text;
-    # errors carry the error JSON as text only.
-    content = [types.TextContent(type="text", text=json.dumps(body))]
-    if is_error:
-        return types.CallToolResult(content=content, is_error=True)
-    return types.CallToolResult(content=content, structured_content=body)
-
-
-def _error(code: str, message: str, details: dict[str, Any]) -> types.CallToolResult:
-    return _text_result({"error": {"code": code, "message": message, "details": details}}, is_error=True)
-
-
-def _validation_error(exc: ValidationError) -> types.CallToolResult:
-    fields = [{"field": ".".join(str(p) for p in e["loc"]), "issue": e["msg"]} for e in exc.errors()]
-    return _error("VALIDATION_ERROR", "Invalid tool input.", {"fields": fields})
-
-
 def run_tool(spec: ToolSpec, staff_id: str, arguments: dict[str, Any]) -> types.CallToolResult:
-    """Run one tool call through the §6.3 check order. Blocking; one connection per call."""
+    """Run one tool call through the §6.3 check order. Blocking; one connection per call.
+
+    validation -> identity -> role -> service (ownership, business rules, write).
+    """
     try:
         try:
             args = spec.input_model.model_validate(arguments)
         except ValidationError as exc:
-            return _validation_error(exc)
+            return errors.validation_error_result(exc)
 
         conn = db.connect()
         try:
             caller = identity.resolve(conn, staff_id)  # REQ-03: every call
             if caller is None:
                 logger.warning("CB_STAFF_ID=%r no longer resolves; tool %s refused", staff_id, spec.name)
-                return _error("UNAUTHENTICATED", "The configured staff identity no longer exists.", {})
+                return errors.error_result(
+                    errors.UNAUTHENTICATED, "The configured staff identity no longer exists.", {}
+                )
+            if not permissions.is_allowed(caller.role, spec.name):
+                raise errors.forbidden_role(caller.role, spec.name, list(permissions.ALLOWED_ROLES[spec.name]))
             output = spec.handler(conn, caller, args)
         finally:
             conn.close()
-        return _text_result(output.model_dump(mode="json"), is_error=False)
+        return errors.success_result(output.model_dump(mode="json"))
+    except errors.AppError as exc:
+        logger.warning("tool %s refused: %s %s", spec.name, exc.code, exc.details)
+        return errors.error_result(exc.code, exc.message, exc.details)
     except Exception as exc:
         error_id = uuid.uuid4().hex
         logger.exception("tool %s raised an unexpected exception; error_id=%s", spec.name, error_id)
         retryable = isinstance(exc, sqlite3.OperationalError) and exc.sqlite_errorname == "SQLITE_BUSY"
-        return _error("INTERNAL_ERROR", "Internal error.", {"error_id": error_id, "retryable": retryable})
+        return errors.error_result(
+            errors.INTERNAL_ERROR, "Internal error.", {"error_id": error_id, "retryable": retryable}
+        )
 
 
 def build_server(staff_id: str) -> Server:
