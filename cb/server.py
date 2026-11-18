@@ -99,6 +99,39 @@ TOOLS = {
             read_only=False,
         ),
         ToolSpec(
+            name="approve_request",
+            description=(
+                "Approve a PENDING request and reserve its full amount against its fund. "
+                "Fails if the fund's available amount is insufficient. Requires PROGRAM_MANAGER."
+            ),
+            input_model=models.ApproveRequestInput,
+            output_model=models.Request,
+            handler=service.approve_request,
+            read_only=False,
+        ),
+        ToolSpec(
+            name="reject_request",
+            description=(
+                "Reject a PENDING request with a reason (1–500 characters). "
+                "Funding is unchanged. Requires PROGRAM_MANAGER."
+            ),
+            input_model=models.RejectRequestInput,
+            output_model=models.Request,
+            handler=service.reject_request,
+            read_only=False,
+        ),
+        ToolSpec(
+            name="record_payment",
+            description=(
+                "Record a simulated payment for the full amount of an APPROVED request. "
+                "Moves the amount from committed to paid. Succeeds only once per request. Requires FINANCE."
+            ),
+            input_model=models.RecordPaymentInput,
+            output_model=models.Request,
+            handler=service.record_payment,
+            read_only=False,
+        ),
+        ToolSpec(
             name="get_request",
             description="Get one request of your nonprofit by id, including payment details if paid. Read-only.",
             input_model=models.GetRequestInput,
