@@ -2,7 +2,7 @@
 
 **Tools:** Claude Code with Claude Opus 5.5 for drafting and implementation, and a separate Claude Opus 5.5 chat session for independent review. Every delegated batch followed the rules in TASKS.md (tests first, review gate, my own test run, commit). A factual per-task log was kept during the work; the three examples below are taken from it.
 
-<<OPTIONAL — keep if true:>> Before starting the timed session I discussed the brief and stack options with Claude.
+Before starting the timed session I discussed the brief and stack options with Claude.
 
 ## 1. Requirements analysis and specification
 
