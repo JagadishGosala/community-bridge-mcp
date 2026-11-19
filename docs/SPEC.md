@@ -406,3 +406,4 @@ In production the server would run over MCP Streamable HTTP as an **OAuth 2.1 re
 | 1.0 | 2026-11-18 | Initial specification | — |
 | 1.1 | 2026-11-18 | TASKS.md: tasks delegated in 6 risk-based batches instead of one prompt per task | Fit the 3-hour time box; review gates, tests-first and per-batch commits retained |
 | 1.2 | 2026-11-18 | Stack: FastMCP → `mcp` 2.3 low-level `Server`; §8 implementation note rewritten (adapter, connection per call, unknown tool = JSON-RPC `-32602`) | T3 spike (mcp 2.3.0): FastMCP was renamed `MCPServer`; its high-level API silently drops unknown arguments, prefixes error text ("Error executing tool …") and nests single-model parameters, each conflicting with REQ-07, REQ-27 or §8. The low-level `Server` passes raw arguments and returned `CallToolResult`s through unchanged. |
+| 1.3 | 2026-11-18 | TASKS.md: batches C and D executed as one batch | Time box; the same tests-first two-prompt split and review gate were kept |

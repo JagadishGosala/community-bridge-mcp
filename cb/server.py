@@ -26,7 +26,8 @@ from pydantic import BaseModel, ValidationError
 from cb import config, db, errors, identity, log, models, permissions, service
 from cb.identity import Caller
 
-logger = logging.getLogger(__name__)
+# Explicit name: under `python -m cb.server` __name__ is "__main__", which would mislabel log records.
+logger = logging.getLogger("cb.server")
 
 
 @dataclass(frozen=True)

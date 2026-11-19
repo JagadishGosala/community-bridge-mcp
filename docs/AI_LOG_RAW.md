@@ -30,6 +30,14 @@
 - **Verification:** Review was by reading only; execution evidence is my own 17-passed pytest run (batch B entry). I checked the listed revision-1.2 edits in SPEC.md and TASKS.md.
 - **Corrections:** None
 
+### 2026-11-18 09:35 — Review of cb/server.py and spec revision 1.2
+- **Model/session:** Claude Opus 5.5 (claude-opus-5-5), Claude app chat session (separate from the Claude Code session that wrote the code)
+- **Prompt excerpt:** "check the cb/server.py yourself and validate it." / "also check if the rest of changes are in place or not. If not do them."
+- **What you produced:** Read cb/server.py, cb/identity.py, cb/config.py, cb/log.py, cb/reset.py, cb/db.py (connect/transaction), pyproject.toml and tests/e2e/*. No code changed. Edited docs/SPEC.md (§1 stack line, §8 implementation note, new §15 row 1.2) and docs/TASKS.md (three FastMCP mentions). Review points given in chat.
+- **Uncertainties / assumptions you made:** Did not run the test suite (no access to a shell on the machine); review is by reading the code against SPEC §6.3, §6.5, §8 and A-16/A-17. Added the unknown-tool JSON-RPC -32602 behavior to §8 and revision 1.2 because the batch B entry reports it and SPEC did not cover it.
+- **Verification:** TODO (human)
+- **Corrections:** TODO (human)
+
 ### 2026-11-18 09:40 — Batch C+D tests (T4–T7, tests only)
 - **Model/session:** Claude Opus 5.5 (claude-opus-5-5), continued session (Claude Code, VS Code extension; same session as batches A and B)
 - **Prompt excerpt:** "Implement batch C+D from docs/TASKS.md (tasks T4, T5, T6, T7), TEST-FIRST. This prompt: TESTS ONLY. Do not write implementation code yet." / "Use the exact ids, names, amounts and expected values from SPEC §11–§12. Assert error codes and the relevant details fields, not just \"is_error\"." / "Run `uv run pytest -v` and show me the failing output (the batch B tests must still pass). Then stop."
@@ -67,5 +75,37 @@
 - **Prompt excerpt:** "F is running. Give me the drafts now"
 - **What you produced:** Created README.md (setup/commands, client config, fixture identities, design decisions, concurrency explanation, results/time/limitations/next priorities) and docs/AI_LOG.md (three examples drawn from AI_LOG_RAW.md entries). Rewrote docs/TRACEABILITY.md with actual implementation files and test files (AC/REQ ids grepped from tests/*), and a Result column. Batch F results, the final test count, time spent and the negative-control outcome are left as <<placeholders>>.
 - **Uncertainties / assumptions you made:** Result ✅ marks for non-F rows rely on the reported 322-passed run after batch E, not on a run I executed. Time-spent figures are estimates from AI_LOG_RAW timestamps. Platform line assumes Windows 11. The optional disclosure line in AI_LOG.md is marked for the user to keep or delete.
+- **Verification:** TODO (human)
+- **Corrections:** TODO (human)
+
+### 2026-11-18 10:18 — Batch F (T10, T11, T12): discovery, concurrency, end-to-end flow, stdout, demo
+- **Model/session:** Claude Opus 5.5 (claude-opus-5-5), continued session (Claude Code, VS Code extension; same session as batches A–E)
+- **Prompt excerpt:** "Implement batch F from docs/TASKS.md (tasks T10, T11, T12). All business logic exists; this batch is integration tests and the demo. Do not change cb/ business behaviour; if a test reveals a bug, stop and report it before fixing." / "Then run the negative control ONCE, not kept in the suite" / "Runs cb-reset on a temp DB (do not touch ./data)"
+- **What you produced:** Added an mcp_session fixture to tests/e2e/conftest.py. Created tests/e2e/test_discovery.py (AC-40; descriptions compared with the SPEC §8 table), tests/e2e/test_concurrency.py (AC-30, 10 parametrized iterations, two cb-server processes as stf_bridge_pm with CB_TEST_TX_DELAY_MS=300, asyncio.gather), tests/e2e/test_flow.py (AC-31, AC-34), tests/e2e/test_stdout.py (AC-29 over the AC-31 flow plus an INVALID_TRANSITION call, raw JSON-RPC over pipes for three processes), tests/e2e/test_demo.py, scripts/demo.py. No cb/ changes. Negative control (throwaway wrapper server with a read-balance-then-update approve and a throwaway test module re-running the unchanged AC-30 test, both deleted): failed with "assert 2 == 1" (both 6000.00 requests APPROVED). `uv run pytest -v`: 338 passed in 57.53s, 0 skipped.
+- **Uncertainties / assumptions you made:** AC-30 set-up (R_A, R_B) uses the in-process adapter rather than a CW server process. list_resources/list_prompts return JSON-RPC "Method not found" and the server declares no resources/prompts capability; the test accepts that or an empty list. Observation, not fixed: under `python -m cb.server` (how tests launch the server) log records are named "__main__" instead of "cb.server"; my first test_stdout assertion included the logger name and failed, so I changed that new test to match level and message only. The demo resets its temp DB in-process with cb.reset.main() and sends server logs to stderr. The overlap of the two approvals is ensured by the delay hook, not measured by the test.
+- **Verification:** TODO (human)
+- **Corrections:** TODO (human)
+
+### 2026-11-18 10:22 — Fill batch F results into README, AI_LOG, TRACEABILITY
+- **Model/session:** Claude Opus 5.5 (claude-opus-5-5), Claude app chat session (continued)
+- **Prompt excerpt:** user pasted the batch F report (338 passed, negative-control output, logger-name finding) with no further text
+- **What you produced:** Replaced placeholders in README.md (concurrency verification and negative-control result, test summary "338 passed in 57.53s", platform line), docs/AI_LOG.md (example 3 evidence and the logger-name finding) and docs/TRACEABILITY.md (header with final count, ✅ for batch F rows, "× 10"). All values copied from the batch F report. Remaining placeholders left for the user: time-spent table, optional disclosure line, and the logger-name resolution.
+- **Uncertainties / assumptions you made:** Did not run the suite myself; values are from the agent's reported run. Removed the SQLite version from the platform line rather than guess it.
+- **Verification:** TODO (human)
+- **Corrections:** TODO (human)
+
+### 2026-11-18 10:30 — Final repo review and loose-end fixes
+- **Model/session:** Claude Opus 5.5 (claude-opus-5-5), Claude app chat session (continued)
+- **Prompt excerpt:** "do a review overall on the entire repo once and make sure there is no lose end. Make changes as required including the 1st point you mentioned"
+- **What you produced:** Copied the repo to a Linux container and ran `uv sync --locked` and `uv run pytest`: 338 passed (Python 3.12.3, SQLite 3.45.1, mcp 2.3.0); `scripts/demo.py` exited 0 with the expected final summary. Read all of cb/, scripts/demo.py and the tests' structure against SPEC. Changed cb/server.py: logger named explicitly "cb.server" (was `__name__`, which is "__main__" under `python -m`); re-ran: 338 passed, and a startup error line now shows "cb.server". Docs: README (Linux results, limitations, link to this log), AI_LOG.md (logger finding resolution), TASKS.md (C and D run as one batch), SPEC §15 revision 1.3. Restored three entries missing from this file (09:35 review, 10:18 batch F, 10:22 docs fill-in) from earlier copies; the 09:35 entry had been absent since the batch C+D session and the last two disappeared around 10:24, probably an editor saving an older buffer.
+- **Uncertainties / assumptions you made:** The Linux run is in a separate container, not CI. Restored entries are copies of what was written earlier; any Verification/Corrections text the user may have added to them after they were lost cannot be recovered. Time-spent table and the optional disclosure line in AI_LOG.md are left for the user.
+- **Verification:** TODO (human)
+- **Corrections:** TODO (human)
+
+### 2026-11-19 07:52 — README: add Tools section
+- **Model/session:** Claude Opus 5.5 (claude-opus-5-5), Claude app chat session (continued)
+- **Prompt excerpt:** "shouldn't these be mentioned specifically in readme ?"
+- **What you produced:** README.md: replaced the one-line tool list with a "Tools" section (10-row table: allowed roles, inputs, result/effect, plus scoping, money format, identity and unknown-field rules), summarised from SPEC §8 and §9. No other files changed.
+- **Uncertainties / assumptions you made:** Noticed the README "Time spent" table still contains `<<…>>` placeholders in the pushed version; left them for the user, since only they know the actual times.
 - **Verification:** TODO (human)
 - **Corrections:** TODO (human)

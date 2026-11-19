@@ -4,7 +4,7 @@ A headless MCP server (stdio) that lets nonprofit staff submit, approve or rejec
 
 **Stack:** Python 3.12, official `mcp` SDK 2.3 (low-level `Server`), Pydantic v2, SQLite (stdlib `sqlite3`), pytest, uv.
 
-**Documents:** [Specification](docs/SPEC.md) (v1.0 committed before any code; revisions in §15) · [Implementation plan](docs/TASKS.md) · [Requirement → code → test mapping](docs/TRACEABILITY.md) · [AI workflow](docs/AI_LOG.md)
+**Documents:** [Specification](docs/SPEC.md) (v1.0 committed before any code; revisions in §15) · [Implementation plan](docs/TASKS.md) · [Requirement → code → test mapping](docs/TRACEABILITY.md) · [AI workflow](docs/AI_LOG.md) (per-task log: [AI_LOG_RAW.md](docs/AI_LOG_RAW.md))
 
 ## Setup and commands
 
@@ -51,7 +51,24 @@ One server entry per identity (identity is fixed per process):
 }
 ```
 
-Tools: `whoami`, `list_participants`, `list_funds`, `get_funding_summary`, `get_request`, `list_requests`, `create_request`, `approve_request`, `reject_request`, `record_payment` (schemas and errors in SPEC §8).
+## Tools
+
+Every tool works only on the caller's own nonprofit; another nonprofit's records return `NOT_FOUND`. Money is returned as two-decimal strings. No tool accepts a role, nonprofit or staff field (identity comes only from `CB_STAFF_ID`), and unknown input fields are rejected. Full input/output schemas and error codes: SPEC §8; role matrix: SPEC §9.
+
+| Tool | Allowed roles | Input | Result / effect |
+|---|---|---|---|
+| `whoami` | all | — | Caller's staff id, name, role and nonprofit |
+| `list_participants` | all | — | Participants of the caller's nonprofit |
+| `list_funds` | all | — | Funds with their fixed allocation |
+| `get_funding_summary` | all | `fund_id`? | Allocation, committed, paid and available per fund |
+| `get_request` | all | `request_id` | One request, with its payment if paid |
+| `list_requests` | all | `status`?, `fund_id`? | Requests, oldest first |
+| `create_request` | Case worker | `participant_id`, `fund_id`, `purpose`, `amount` (e.g. `"300.00"`), `description`? | New `PENDING` request; reserves nothing |
+| `approve_request` | Program manager | `request_id` | `PENDING` → `APPROVED`; reserves the full amount, or `INSUFFICIENT_FUNDS` |
+| `reject_request` | Program manager | `request_id`, `reason` | `PENDING` → `REJECTED`; balances unchanged |
+| `record_payment` | Finance | `request_id` | `APPROVED` → `PAID`; moves the amount from committed to paid, once |
+
+`purpose` is `RENT`, `UTILITIES`, `TRANSPORTATION` or `OTHER` (`OTHER` requires `description`). `?` marks optional fields.
 
 ## Key design decisions
 
@@ -73,16 +90,16 @@ Approval runs inside `BEGIN IMMEDIATE`, which takes SQLite's single write lock b
 338 passed in 57.53s
 ```
 
-Platform: Windows, Python 3.12.14, mcp 2.3.0. No failed or skipped tests. Checked manually rather than by automated test: AC-41 (`uv sync --locked`). The AC-30 negative control was run once and is not part of the suite.
+Platforms: Windows (Python 3.12.14, mcp 2.3.0) and Linux (Python 3.12.3, SQLite 3.45.1, mcp 2.3.0, same 338 passed); the demo also exits 0 on both. No failed or skipped tests. Checked manually rather than by automated test: AC-41 (`uv sync --locked`). The AC-30 negative control was run once and is not part of the suite.
 
 ## Time spent
 
 | Phase | Time |
 |---|---|
-| Specification (agent draft, independent review, fixes, commit) | <<~40 min>> |
-| Implementation and tests, batches A–F | <<~1 h 50 min>> |
-| Documentation | <<~20 min>> |
-| **Total** | <<~2 h 50 min>> |
+| Specification (agent draft, independent review, fixes, commit) | ~40 min |
+| Implementation and tests, batches A–F | ~1 h 50 min |
+| Documentation | ~20 min |
+| **Total** | ~2 h 50 min |
 
 ## Known limitations
 
@@ -90,7 +107,7 @@ Platform: Windows, Python 3.12.14, mcp 2.3.0. No failed or skipped tests. Checke
 - SQLite allows one writer at a time; a lock wait over 5 s returns `INTERNAL_ERROR` with `retryable: true`.
 - One identity per server process; switching identity means relaunching (A-12).
 - Lists are unpaginated (A-14).
-- Developed and tested on Windows only; not yet run on Linux or macOS.
+- Tested on Windows and Linux; not run on macOS.
 - Decision and payment timestamps are tested for format, not for ordering.
 - The duplicate-payment backstop (reachable only with corrupted data) reports `current_status: "PAID"`.
 - Every expected error (role refused, not found, …) is logged at WARNING; a judgement call on Q-11.
@@ -100,5 +117,5 @@ Platform: Windows, Python 3.12.14, mcp 2.3.0. No failed or skipped tests. Checke
 
 1. Idempotency keys on mutating tools.
 2. Streamable HTTP transport with the OAuth resource-server integration in SPEC §13.
-3. Run CI on Linux and macOS.
+3. CI on every push (Linux, Windows, macOS).
 4. Pagination for list tools, and an append-only audit log of status changes (Q-09).

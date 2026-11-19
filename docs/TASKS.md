@@ -57,14 +57,13 @@ Tasks T4 and T2–T3 can run in parallel. Everything else is sequential.
 
 ### Execution batches
 
-To fit the time box, tasks are delegated in six risk-based batches instead of one prompt per task. Low-risk, mechanical tasks are combined; uncertain or money-critical work gets its own batch. Tests-first, review gates, per-batch commits and logging are unchanged.
+To fit the time box, tasks are delegated in risk-based batches instead of one prompt per task (six planned; C and D were run together, so five in practice). Low-risk, mechanical tasks are combined; uncertain or money-critical work gets its own batch. Tests-first, review gates, per-batch commits and logging are unchanged.
 
 | Batch | Tasks | Prompts |
 |---|---|---|
 | A | T1 + T2 (scaffold, schema, reset/seed) | 1 |
 | B | T3 (walking skeleton + MCP SDK spike) | 1 |
-| C | T4 + T5 (money, models, errors, permissions, check-order pipeline) | 2 (tests, then code) |
-| D | T6 + T7 (reads, create_request) | 2 (tests, then code) |
+| C+D | T4 + T5 + T6 + T7 (money, models, errors, permissions, check-order pipeline, reads, create_request); planned as two batches, run as one to save time | 2 (tests, then code) |
 | E | T8 + T9 (approve, reject, record_payment) | 2 (tests, then code) |
 | F | T10 + T11 + T12 (tool registration, concurrency, e2e flow + demo) | 1–2 |
 | — | T13 (docs) | done by me with AI assistance |
